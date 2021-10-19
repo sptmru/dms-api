@@ -1,0 +1,8 @@
+{
+    "require": {
+        "monolog/monolog": "^2.3",
+        "fpdf/fpdf": "^1.83",
+        "setasign/fpdi": "^2.3",
+        "setasign/fpdf": "^1.8"
+    }
+}
