@@ -34,35 +34,27 @@ class Certificate {
     
     $pdf = $this->generate_application($data, $policy_number, $current_date);
     return '
-    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://medins.mos.ru/medins/mmc" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:soap-enc="http://schemas.xmlsoap.org/soap/encoding/">
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://medins.mos.ru/medins/mmc" xmlns:s0="http://medins.mos.ru/medins/mmc" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:soap-enc="http://schemas.xmlsoap.org/soap/encoding/">
     <soapenv:Body>
     <tns:obtainCertificateResponse>
     <tns:result code="OK"/>
     <tns:cert number="'.$policy_number.'">
-    <s0:certFile>'.$pdf.'
-    </s0:certFile>
+    <tns:certFile>'.$pdf.'</tns:certFile>
+    </tns:cert>
+    </tns:obtainCertificateResponse>
     </soapenv:Body>
     </soapenv:Envelope>
     ';
   }
 
   public function update(SimpleXMLElement $data): string {
-    $policy_data = $data->soapenvBody->mmcsetPaymentFlagRequest->mmcpaidCertificate;
-  
-    $updated_policy_data = [
-      'paymentId' => $policy_data->attributes()->paymentId,
-      'paymentDate' => $policy_data->attributes()->paymentDate,
-      'number' => $policy_data->attributes()->number,
-    ];
-  
-    $sql = "UPDATE policy SET paymentId=:paymentId, paymentDate=:paymentDate WHERE number=:number";
-    $stmt = $this->pdo->prepare($sql);
-    $result = $stmt->execute($updated_policy_data);
+    $resultCode = $this->update_policy($data);
+ 
     return '
-    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://medins.mos.ru/medins/mmc" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:soap-enc="http://schemas.xmlsoap.org/soap/encoding/">
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://medins.mos.ru/medins/mmc" xmlns:s0="http://medins.mos.ru/medins/mmc" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:soap-enc="http://schemas.xmlsoap.org/soap/encoding/">
     <soapenv:Body>
     <tns:setPaymentFlagResponse>
-    <tns:result code="OK"/>
+    <tns:result code="'.$resultCode.'"/>
     </tns:setPaymentFlagResponse>
     </soapenv:Body>
     </soapenv:Envelope>
@@ -72,7 +64,7 @@ class Certificate {
   public function healthcheck(SimpleXMLElement $data): string {
     $link = $data->attributes()["xmlnsmmc"];
     $xml = '
-    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:soap-enc="http://schemas.xmlsoap.org/soap/encoding/">
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://medins.mos.ru/medins/mmc" xmlns:s0="http://medins.mos.ru/medins/mmc" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:soap-enc="http://schemas.xmlsoap.org/soap/encoding/">
     <soapenv:Body>
     <checkResponse xmlns="'.$link.'">
     <xsd:return>OK</xsd:return>
@@ -171,8 +163,11 @@ class Certificate {
   
     $application->SetXY(90, 202);
     $application->Write(0, substr($current_date->format("Y"), -2));
+    //$application->Output();
+    $pdf = $application->Output('', 'S');
+    $result = bin2hex($pdf); 
   
-    return base64_encode($application->Output('', 'S'));
+    return $pdf;
   }
 
   private function add_person(SimpleXMLElement $data): string {
@@ -234,6 +229,32 @@ class Certificate {
     $xml = trim(preg_replace("/\r|\n/", '', $xml));
     $xml = str_replace("xmlns:", "xmlns", $xml);
     return simplexml_load_string($xml);
+  }
+
+  private function update_policy(SimpleXMLElement $data): string {
+    $this->log->debug("Updating policy");
+    $policy_data = $data->soapenvBody->mmcsetPaymentFlagRequest->mmcpaidCertificate;
+  
+    $updated_policy_data = [
+      'paymentId' => $policy_data->attributes()->paymentId,
+      'paymentDate' => $policy_data->attributes()->paymentDate,
+      'number' => $policy_data->attributes()->number,
+    ];
+
+    $countSql = 'select count(*) from policy WHERE number = ?';
+    $countStmt = $this->pdo->prepare($countSql);
+    $countStmt->execute([$policy_data->attributes()->number]);
+    $count = $countStmt->fetchColumn();
+
+    if ($count != 0) {
+      $sql = "UPDATE policy SET paymentId=:paymentId, paymentDate=:paymentDate WHERE number=:number";
+      $stmt = $this->pdo->prepare($sql);
+      $result = $stmt->execute($updated_policy_data);
+      $resultCode = "OK";
+    } else {
+      $resultCode = "INVALID_DATA";
+    }
+    return $resultCode;
   }
   
   private function generate_policy_number(DateTime $date): string {
