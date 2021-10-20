@@ -34,7 +34,7 @@ class Certificate {
     
     $pdf = $this->generate_application($data, $policy_number, $current_date);
     return '
-    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://example.org/publishing" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:soap-enc="http://schemas.xmlsoap.org/soap/encoding/">
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://medins.mos.ru/medins/mmc" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:soap-enc="http://schemas.xmlsoap.org/soap/encoding/">
     <soapenv:Body>
     <tns:obtainCertificateResponse>
     <tns:result code="OK"/>
@@ -59,7 +59,7 @@ class Certificate {
     $stmt = $this->pdo->prepare($sql);
     $result = $stmt->execute($updated_policy_data);
     return '
-    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://example.org/publishing" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:soap-enc="http://schemas.xmlsoap.org/soap/encoding/">
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="http://medins.mos.ru/medins/mmc" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:soap-enc="http://schemas.xmlsoap.org/soap/encoding/">
     <soapenv:Body>
     <tns:setPaymentFlagResponse>
     <tns:result code="OK"/>
@@ -207,7 +207,7 @@ class Certificate {
     return $result ? $this->pdo->lastInsertId() : '';
   }
 
-  private function add_policy(string $person_id, DateTime $date, SimpleXMLElement $data) {
+  private function add_policy(string $person_id, DateTime $date, SimpleXMLElement $data): string {
     $this->log->debug("Adding policy for person $person_id");
     if ($person_id === FALSE) {
       return FALSE;
